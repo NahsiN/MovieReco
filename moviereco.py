@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # ----------------------------------------------------------------------- #
 # STEP 1: Parse sql data into Python
 # Read contents from database file
-db_path = 'MyVideos99_Anime.db'
+db_path = 'MyVideos99_NoBollywood.db'
 # open a connection to database
 conn = sqlite3.connect(db_path)
 # open a cursor object
@@ -95,12 +95,21 @@ for gi in genres:
     if df_genre_corrs.loc[gi, gi] != 0:
         df_genre_corrs.loc[gi, :] = df_genre_corrs.loc[gi, :]/df_genre_corrs.loc[gi, gi]
 
+print('Genre correlations matrix created.')
 # Visualize genre correlations
+# plt.figure()
+# plt.spy(df_genre_corrs, markersize=3)
 plt.figure()
-plt.spy(df_genre_corrs, markersize=3)
-plt.figure()
-plt.imshow(np.array(df_genre_corrs, dtype=float))
+plt.pcolormesh(np.array(df_genre_corrs, dtype=float), cmap='gnuplot', edgecolor=None)
 plt.colorbar()
+# create labels
+x_points = []
+x_labels = []
+for i in range(0, df_genre_corrs.index.size):
+    x_points.append(i + 0.5)
+    x_labels.append('{0:.3}'.format(df_genre_corrs.index[i]))
+plt.xticks(x_points, x_labels)
+plt.yticks(x_points, x_labels)
 plt.show()
 
 # ----------------------------------------------------------------------- #
@@ -117,22 +126,26 @@ for k in range(0, df_kodi.index.size):
     avg_movie_rating = float(df_kodi.loc[k, 'Rating'])
     prefactor = avg_movie_rating/len(preferred_genres_set)
     recomm_pts = 0
-    if len(preferred_genres_set & df_kodi.loc[k, 'Genres']) != 0:
-        # loop over preferred genres
-        for gi in preferred_genres_set:
-            # loop over the movie genre set
-            for gj in df_kodi.loc[k, 'Genres']:
-                if gi == gj:
-                    recomm_pts += prefactor*df_genre_corrs.loc[gi, gj]
-                else:
-                    recomm_pts += prefactor*df_genre_corrs.loc[gi, gj]/(len(df_kodi.loc[k, 'Genres']) - 1)
+    # common genres between user preffered genres and movie genre set
+    gi_common = preferred_genres_set & df_kodi.loc[k, 'Genres']
+    # if len(gi_common) != 0:
+    # loop over comon genres
+    for gi in gi_common:
+        # loop over the movie genre set
+        for gj in df_kodi.loc[k, 'Genres']:
+            if gi == gj:
+                recomm_pts += prefactor*df_genre_corrs.loc[gi, gj]
+            else:
+                if len(df_kodi.loc[k, 'Genres']) == 1:
+                    ipdb.set_trace()
+                recomm_pts += prefactor*df_genre_corrs.loc[gi, gj]/(len(df_kodi.loc[k, 'Genres']) - 1)
 
-    elif len(preferred_genres_set & df_kodi.loc[k, 'Genres']) == 0:
-        for gi in preferred_genres_set:
-            for gj in preferred_genres_set:
-                recomm_pts += prefactor/len(df_kodi.loc[k, 'Genres'])*df_genre_corrs.loc[gi, gj]
-    else:
-        print('How did I fall here. Investigate')
+    # elif len(preferred_genres_set & df_kodi.loc[k, 'Genres']) == 0:
+    for gi in preferred_genres_set - gi_common:
+        for gj in df_kodi.loc[k, 'Genres']:
+            recomm_pts += prefactor/len(df_kodi.loc[k, 'Genres'])*df_genre_corrs.loc[gi, gj]
+    # else:
+    #     print('How did I fall here. Investigate')
     # print('Movie Name = {0}, Recommendation Points = {1}'.format(df_kodi.loc[k, 'MovieName'], recomm_pts))
     df_kodi.loc[k, 'Recommendation Points'] = recomm_pts
 
