@@ -5,11 +5,14 @@ import ipdb
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from time import time
+from datetime import timedelta
 
 # ----------------------------------------------------------------------- #
 # STEP 1: Parse sql data into Python
 # Read contents from database file
-db_path = 'MyVideos99_NoBollywood.db'
+db_path = 'MyVideos99_All.db'
+start = time()
 # open a connection to database
 conn = sqlite3.connect(db_path)
 # open a cursor object
@@ -26,10 +29,13 @@ genres = cur.fetchall()
 # close database
 # conn.commit()  # commit your changes
 conn.close()
-print('Data from SQL file loaded.')
+end = time()
+elapsed_time = timedelta(seconds=end - start)
+print('Data of {0} movies from SQL file loaded. {1}'.format(len(data), elapsed_time))
 
 # Parse the SQL data into a dataframe
 # strip the tuples in genres list
+start = time()
 genres = [genre[0] for genre in genres]
 genres.sort()  # sort genres alphabetically IN-place
 # Parse this data into a nicer pandas format
@@ -51,8 +57,9 @@ for i in range(0, df_kodi.Genres.size):
     # list
     genres_list = df_kodi.Genres[i].split('/')
     df_kodi.Genres[i] = set([genre.strip() for genre in genres_list])
-
-print('Data parsed into a pandas table.')
+end = time()
+elapsed_time = timedelta(seconds=end-start)
+print('Data parsed into a pandas table. {0}'.format(elapsed_time))
 # ----------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------- #
@@ -112,10 +119,11 @@ def gen_corr_matrix(df_kodi):
     return df_genre_corrs
 
 
+start = time()
 df_genre_corrs = gen_corr_matrix(df_kodi)
-print('Genre correlations matrix created.')
-
-
+end = time()
+elapsed_time = timedelta(seconds=end-start)
+print('Genre correlations matrix created. {0}'.format(elapsed_time))
 
 
 # Visualize genre correlations
@@ -188,11 +196,15 @@ def gen_recomm_pts(df_genre_corrs, preferred_genres_set, movie_genres_set, avg_m
 
     return recomm_pts
 
+start = time()
 # loop over movies
 for k in range(0, df_kodi.index.size):
     df_kodi.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi.loc[k, 'Genres'], float(df_kodi.loc[k, 'Rating']))
 
 # Normalize recommendation points column
 df_kodi.loc[:, 'Recommendation Points'] = df_kodi.loc[:, 'Recommendation Points']/df_kodi.loc[:, 'Recommendation Points'].max()
+end = time()
+elapsed_time = timedelta(seconds=end-start)
+print('Finished generating recommendation points. {0}'.format(elapsed_time))
 print('Preferred genres = {0}'.format(preferred_genres_set))
 print(df_kodi.sort_values(by=['Recommendation Points'], ascending=False).head(10))
