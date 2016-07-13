@@ -58,44 +58,66 @@ print('Data parsed into a pandas table.')
 # ----------------------------------------------------------------------- #
 # STEP 2, Compute genre correlations
 # create genre correlations dataframe
-df_genre_corrs = pd.DataFrame(index=genres, columns=genres)
-df_genre_corrs.iloc[:, :] = 0
 
-# MAIN ALGO constructs genre correlation matrix
-# loop over genres (i)
-for gi in genres:
-    # select all movies having genre gi
-    movie_ids = []
-    for k in range(0, df_kodi.index.size):
-        if gi in df_kodi.loc[k, 'Genres']:
-            movie_ids.append(k)
-    if len(movie_ids) == 0:
-        print('No movies with genre={0} found'.format(gi))
+def gen_corr_matrix(df_kodi):
+    """
+    Creates the genre correlation matrix.
 
-    # loop over the other genres (j)
-    for gj in genres:
-        # create genre set G_ij
-        g_ij = {gi, gj}
-        # consider only those movies that have gi as a genre
+    Parameters
+    ----------
+    df_kodi: Pandas dataframe with all the relevant info
+
+    Returns
+    -------
+    df_genre_corrs: Genre correlation matrix
+    """
+
+    df_genre_corrs = pd.DataFrame(index=genres, columns=genres)
+    df_genre_corrs.iloc[:, :] = 0
+
+    # MAIN ALGO constructs genre correlation matrix
+    # loop over genres (i)
+    for gi in genres:
+        # select all movies having genre gi
+        movie_ids = []
+        for k in range(0, df_kodi.index.size):
+            if gi in df_kodi.loc[k, 'Genres']:
+                movie_ids.append(k)
         if len(movie_ids) == 0:
-            pass
-        else:
-            # loop only over the movies that have genre gi to determine
-            # correaltions
-            for k in movie_ids:
-                # computes intersection of G_ij with movie genre set
-                common_genres = g_ij & df_kodi.loc[k, 'Genres']
-                if len(common_genres) == 2 and gi != gj:
-                    df_genre_corrs.loc[gi, gj] += 1
-                elif len(common_genres) == 1 and gi == gj:
-                    df_genre_corrs.loc[gi, gj] += 1
+            print('No movies with genre={0} found'.format(gi))
 
-# Normalize the total movie count for genre gi to unity
-for gi in genres:
-    if df_genre_corrs.loc[gi, gi] != 0:
-        df_genre_corrs.loc[gi, :] = df_genre_corrs.loc[gi, :]/df_genre_corrs.loc[gi, gi]
+        # loop over the other genres (j)
+        for gj in genres:
+            # create genre set G_ij
+            g_ij = {gi, gj}
+            # consider only those movies that have gi as a genre
+            if len(movie_ids) == 0:
+                pass
+            else:
+                # loop only over the movies that have genre gi to determine
+                # correaltions
+                for k in movie_ids:
+                    # computes intersection of G_ij with movie genre set
+                    common_genres = g_ij & df_kodi.loc[k, 'Genres']
+                    if len(common_genres) == 2 and gi != gj:
+                        df_genre_corrs.loc[gi, gj] += 1
+                    elif len(common_genres) == 1 and gi == gj:
+                        df_genre_corrs.loc[gi, gj] += 1
 
+    # Normalize the total movie count for genre gi to unity
+    for gi in genres:
+        if df_genre_corrs.loc[gi, gi] != 0:
+            df_genre_corrs.loc[gi, :] = df_genre_corrs.loc[gi, :]/df_genre_corrs.loc[gi, gi]
+
+    return df_genre_corrs
+
+
+df_genre_corrs = gen_corr_matrix(df_kodi)
 print('Genre correlations matrix created.')
+
+
+
+
 # Visualize genre correlations
 # plt.figure()
 # plt.spy(df_genre_corrs, markersize=3)
@@ -110,6 +132,8 @@ for i in range(0, df_genre_corrs.index.size):
     x_labels.append('{0:.3}'.format(df_genre_corrs.index[i]))
 plt.xticks(x_points, x_labels)
 plt.yticks(x_points, x_labels)
+plt.xlim(0, df_genre_corrs.index.size)
+plt.ylim(0, df_genre_corrs.index.size)
 plt.show()
 
 # ----------------------------------------------------------------------- #
@@ -117,37 +141,56 @@ plt.show()
 # ----------------------------------------------------------------------- #
 # STEPS 3 and 4. Specify user preferred genres and compute recommendation
 # points for each movie
-preferred_genres_set = {'Action', 'Comedy'}
+preferred_genres_set = {'Drama', 'Comedy'}
 
-# loop over movies
-for k in range(0, df_kodi.index.size):
+def gen_recomm_pts(df_genre_corrs, preferred_genres_set, movie_genres_set, avg_movie_rating):
+    """
+    Given user preferred genres, a movie's genre set and it's rating, generate
+    recommendation points for the movie based on genre correaltions
+
+    Parameters
+    ----------
+    df_genre_corrs: genre correlations matrix
+    preffered_genre_set : a set of preferred genres
+    movie_genres_set: set of genres of a movie
+    avg_movie_rating: average movie rating
+
+    Returns
+    -------
+    recomm_pts: Recommendation points for the movie.
+    """
+
+    if type(avg_movie_rating) is not float:
+        raise AssertionError('Average movie rating should be float')
     # see if there is overlap between the preferred genres and movie's
     # genres
-    avg_movie_rating = float(df_kodi.loc[k, 'Rating'])
     prefactor = avg_movie_rating/len(preferred_genres_set)
     recomm_pts = 0
     # common genres between user preffered genres and movie genre set
-    gi_common = preferred_genres_set & df_kodi.loc[k, 'Genres']
+    gi_common = preferred_genres_set & movie_genres_set
     # if len(gi_common) != 0:
     # loop over comon genres
     for gi in gi_common:
         # loop over the movie genre set
-        for gj in df_kodi.loc[k, 'Genres']:
+        for gj in movie_genres_set:
             if gi == gj:
                 recomm_pts += prefactor*df_genre_corrs.loc[gi, gj]
             else:
-                if len(df_kodi.loc[k, 'Genres']) == 1:
-                    ipdb.set_trace()
-                recomm_pts += prefactor*df_genre_corrs.loc[gi, gj]/(len(df_kodi.loc[k, 'Genres']) - 1)
+                if len(movie_genres_set) == 1:
+                    raise AssertionError('Division by 0 imminent. Please investigate.')
+                recomm_pts += prefactor*df_genre_corrs.loc[gi, gj]/(len(movie_genres_set) - 1)
 
-    # elif len(preferred_genres_set & df_kodi.loc[k, 'Genres']) == 0:
+    # loop over user preffered genres NOT common to both user preffered
+    # set and movie genre set
     for gi in preferred_genres_set - gi_common:
-        for gj in df_kodi.loc[k, 'Genres']:
-            recomm_pts += prefactor/len(df_kodi.loc[k, 'Genres'])*df_genre_corrs.loc[gi, gj]
-    # else:
-    #     print('How did I fall here. Investigate')
-    # print('Movie Name = {0}, Recommendation Points = {1}'.format(df_kodi.loc[k, 'MovieName'], recomm_pts))
-    df_kodi.loc[k, 'Recommendation Points'] = recomm_pts
+        for gj in movie_genres_set:
+            recomm_pts += prefactor/len(movie_genres_set)*df_genre_corrs.loc[gi, gj]
+
+    return recomm_pts
+
+# loop over movies
+for k in range(0, df_kodi.index.size):
+    df_kodi.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi.loc[k, 'Genres'], float(df_kodi.loc[k, 'Rating']))
 
 # Normalize recommendation points column
 df_kodi.loc[:, 'Recommendation Points'] = df_kodi.loc[:, 'Recommendation Points']/df_kodi.loc[:, 'Recommendation Points'].max()
