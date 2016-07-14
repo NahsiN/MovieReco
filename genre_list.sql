@@ -1,4 +1,4 @@
 SELECT 
-	name as 'Genres'
+	genre_id, name as 'Genres'
 FROM 
 	genre;

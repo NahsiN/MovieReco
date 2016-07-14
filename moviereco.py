@@ -7,11 +7,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 from datetime import timedelta
+import sys
 
 # ----------------------------------------------------------------------- #
 # STEP 1: Parse sql data into Python
 # Read contents from database file
-db_path = 'MyVideos99_All.db'
+db_path = 'MyVideos99_NoBollywood.db'
 start = time()
 # open a connection to database
 conn = sqlite3.connect(db_path)
@@ -19,12 +20,19 @@ conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
 # Read relevant info from database
-cur.execute("""SELECT c00 as 'MovieName', c05 as 'Rating', c07 as 'Year',
+cur.execute("""SELECT idMovie, c00 as 'MovieName', c05 as 'Rating', c07 as 'Year',
             c14 as 'Genres' FROM movie WHERE Genres != '' LIMIT 1000""")
-col_names = cur.description
+# since the first column name will be idMovie which we want to use as an
+# index instead, we filter it out
+col_names = cur.description[1:]
 data = cur.fetchall()
-cur.execute("SELECT name AS 'Genres' FROM genre")
+
+cur.execute("SELECT genre_id, name AS 'Genres' FROM genre")
 genres = cur.fetchall()
+
+cur.execute("""SELECT genre_id,  media_id as "idMovie" FROM genre_link
+                WHERE media_type = 'movie' """)
+genres_link = cur.fetchall()
 
 # close database
 # conn.commit()  # commit your changes
@@ -36,8 +44,10 @@ print('Data of {0} movies from SQL file loaded. {1}'.format(len(data), elapsed_t
 # Parse the SQL data into a dataframe
 # strip the tuples in genres list
 start = time()
-genres = [genre[0] for genre in genres]
-genres.sort()  # sort genres alphabetically IN-place
+# genre_ids 0 based indexing
+genre_ids = np.array([genre[0] for genre in genres]) - 1
+genres = [genre[1] for genre in genres]
+# genres.sort()  # sort genres alphabetically IN-place
 # Parse this data into a nicer pandas format
 # remove the 6 None entries in col_names due to adhering with Python's DB-API
 # standard
@@ -45,34 +55,57 @@ col_names = [cols[0] for cols in col_names]
 # create a dict for a pandas dataframe
 table_dict = {}
 for key in col_names:
-    table_dict[key] = [entry[col_names.index(key)] for entry in data]
-df_kodi = pd.DataFrame(table_dict)
+    # table_dict[key] = [entry[col_names.index(key)] for entry in data]
+    table_dict[key] = [entry[col_names.index(key) + 1] for entry in data]
 
+# Create dataframe
+# WHAT GUARANTEE IS THERE IS THERE THAT TWO DIFFERENT "for entry in data" WILL
+# ITERATE IN THE SAME ORDER? I CAN ONLY HOPE
+# convert to 0 based notation by subtracting 1
+idsMovie = np.array([entry[0] for entry in data]) - 1
+df_kodi_movie = pd.DataFrame(table_dict, index=idsMovie)
 # convert every entry in Genres column to a set. E.g.,
 # 'Animation / Comedy' --> {'Animation', 'Comedy'}
-# for each_movie_genres in df_kodi.loc[:, 'Genres']:
+# for each_movie_genres in df_kodi_movie.loc[:, 'Genres']:
 # genres_list = each_movie_genres.split('/')
-for i in range(0, df_kodi.Genres.size):
+
+# range doesn't work because there exists some idMovie whose genre is empty
+# and so has been filtered out by the SQL query.
+# for i in range(0, df_kodi_movie.index.size)`:
+for i in df_kodi_movie.index:
     # split string using '/' and then strip whitespaces from each element in
     # list
-    genres_list = df_kodi.Genres[i].split('/')
-    df_kodi.Genres[i] = set([genre.strip() for genre in genres_list])
+    genres_list = df_kodi_movie.Genres[i].split('/')
+    df_kodi_movie.Genres[i] = set([genre.strip() for genre in genres_list])
+
+df_kodi_genre = pd.DataFrame({'Genres': genres}, index=genre_ids)
+
+genres_link_genres = np.array([entry[0] for entry in genres_link]) - 1
+genres_link_idMovies = np.array([entry[1] for entry in genres_link]) - 1
+
+# if you look, the list genress_link_genres has repeating elements. The good
+# thing about Pandas is that it allows duplicate indices. So for e.g.
+# df_kodi_genre_link.loc[0] will list all idMovies with genre_id=0.
+# That's awesome!
+df_kodi_genre_link = pd.DataFrame({'idMovie': genres_link_idMovies}, index=genres_link_genres)
+
 end = time()
 elapsed_time = timedelta(seconds=end-start)
-print('Data parsed into a pandas table. {0}'.format(elapsed_time))
+print('Data parsed into pandas tables. {0}'.format(elapsed_time))
+ipdb.set_trace()
 # ----------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------- #
 # STEP 2, Compute genre correlations
 # create genre correlations dataframe
 
-def gen_corr_matrix(df_kodi):
+def gen_corr_matrix(df_kodi_movie):
     """
     Creates the genre correlation matrix.
 
     Parameters
     ----------
-    df_kodi: Pandas dataframe with all the relevant info
+    df_kodi_movie: Pandas dataframe with all the relevant info
 
     Returns
     -------
@@ -82,19 +115,23 @@ def gen_corr_matrix(df_kodi):
     df_genre_corrs = pd.DataFrame(index=genres, columns=genres)
     df_genre_corrs.iloc[:, :] = 0
 
+    # NEED TO GENERATE GENRES LIST HERE
     # MAIN ALGO constructs genre correlation matrix
     # loop over genres (i)
     for gi in genres:
         # select all movies having genre gi
         movie_ids = []
-        for k in range(0, df_kodi.index.size):
-            if gi in df_kodi.loc[k, 'Genres']:
+        for k in df_kodi_movie.index:
+            if gi in df_kodi_movie.loc[k, 'Genres']:
                 movie_ids.append(k)
         if len(movie_ids) == 0:
             print('No movies with genre={0} found'.format(gi))
 
         # loop over the other genres (j)
-        for gj in genres:
+        # this statement relies on genres being alphabetically SORTED
+        genres_geq_gi = [gj for gj in genres if gj >= gi]
+        # for gj in genres:
+        for gj in genres_geq_gi:
             # create genre set G_ij
             g_ij = {gi, gj}
             # consider only those movies that have gi as a genre
@@ -105,9 +142,10 @@ def gen_corr_matrix(df_kodi):
                 # correaltions
                 for k in movie_ids:
                     # computes intersection of G_ij with movie genre set
-                    common_genres = g_ij & df_kodi.loc[k, 'Genres']
+                    common_genres = g_ij & df_kodi_movie.loc[k, 'Genres']
                     if len(common_genres) == 2 and gi != gj:
                         df_genre_corrs.loc[gi, gj] += 1
+                        df_genre_corrs.loc[gj, gi] += 1
                     elif len(common_genres) == 1 and gi == gj:
                         df_genre_corrs.loc[gi, gj] += 1
 
@@ -120,7 +158,7 @@ def gen_corr_matrix(df_kodi):
 
 
 start = time()
-df_genre_corrs = gen_corr_matrix(df_kodi)
+df_genre_corrs = gen_corr_matrix(df_kodi_movie)
 end = time()
 elapsed_time = timedelta(seconds=end-start)
 print('Genre correlations matrix created. {0}'.format(elapsed_time))
@@ -198,13 +236,13 @@ def gen_recomm_pts(df_genre_corrs, preferred_genres_set, movie_genres_set, avg_m
 
 start = time()
 # loop over movies
-for k in range(0, df_kodi.index.size):
-    df_kodi.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi.loc[k, 'Genres'], float(df_kodi.loc[k, 'Rating']))
+for k in df_kodi_movie.index:
+    df_kodi_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi_movie.loc[k, 'Genres'], float(df_kodi_movie.loc[k, 'Rating']))
 
 # Normalize recommendation points column
-df_kodi.loc[:, 'Recommendation Points'] = df_kodi.loc[:, 'Recommendation Points']/df_kodi.loc[:, 'Recommendation Points'].max()
+df_kodi_movie.loc[:, 'Recommendation Points'] = df_kodi_movie.loc[:, 'Recommendation Points']/df_kodi_movie.loc[:, 'Recommendation Points'].max()
 end = time()
 elapsed_time = timedelta(seconds=end-start)
 print('Finished generating recommendation points. {0}'.format(elapsed_time))
 print('Preferred genres = {0}'.format(preferred_genres_set))
-print(df_kodi.sort_values(by=['Recommendation Points'], ascending=False).head(10))
+print(df_kodi_movie.sort_values(by=['Recommendation Points'], ascending=False).head(10))
