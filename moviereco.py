@@ -20,8 +20,12 @@ conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
 # Read relevant info from database
-cur.execute("""SELECT idMovie, c00 as 'MovieName', c05 as 'Rating', c07 as 'Year',
+try:
+    cur.execute("""SELECT idMovie, c00 as 'MovieName', c05 as 'Rating', c07 as 'Year',
             c14 as 'Genres' FROM movie WHERE Genres != '' LIMIT 1000""")
+except:
+    print('{0} Either this database does not exist or something else went wrong. Exiting.'.format(db_path))
+    sys.exit()
 # since the first column name will be idMovie which we want to use as an
 # index instead, we filter it out
 col_names = cur.description[1:]
@@ -92,40 +96,51 @@ df_kodi_genre_link = pd.DataFrame({'idMovie': genres_link_idMovies}, index=genre
 end = time()
 elapsed_time = timedelta(seconds=end-start)
 print('Data parsed into pandas tables. {0}'.format(elapsed_time))
-ipdb.set_trace()
 # ----------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------- #
 # STEP 2, Compute genre correlations
 # create genre correlations dataframe
 
-def gen_corr_matrix(df_kodi_movie):
+def gen_corr_matrix(df_kodi_movie, df_kodi_genre, df_kodi_genre_link):
     """
     Creates the genre correlation matrix.
 
     Parameters
     ----------
-    df_kodi_movie: Pandas dataframe with all the relevant info
+    df_kodi_movie: Pandas dataframe with info about movie
+    df_kodi_genre: dataframe with info about genres
 
     Returns
     -------
     df_genre_corrs: Genre correlation matrix
     """
 
+    # create a list of genres
+    genres = df_kodi_genre.loc[:, 'Genres'].sort_values().tolist()
+
+    # Initialize correaltion matrix
     df_genre_corrs = pd.DataFrame(index=genres, columns=genres)
     df_genre_corrs.iloc[:, :] = 0
 
-    # NEED TO GENERATE GENRES LIST HERE
     # MAIN ALGO constructs genre correlation matrix
     # loop over genres (i)
     for gi in genres:
         # select all movies having genre gi
-        movie_ids = []
-        for k in df_kodi_movie.index:
-            if gi in df_kodi_movie.loc[k, 'Genres']:
-                movie_ids.append(k)
-        if len(movie_ids) == 0:
+        gi_id = df_kodi_genre[df_kodi_genre.Genres == gi].index  # id for genre gi
+        try:
+            movie_ids = df_kodi_genre_link.loc[gi_id]
+        except KeyError:
             print('No movies with genre={0} found'.format(gi))
+            # empty dataframe so that the l156 loop is skipped
+            movie_ids = pd.DataFrame(columns=['idMovie'])
+        # movie_ids = []
+        # # BIGGEST TIME HOG
+        # for k in df_kodi_movie.index:
+        #     if gi in df_kodi_movie.loc[k, 'Genres']:
+        #         movie_ids.append(k)
+        #if len(movie_ids) == 0:
+        #    print('No movies with genre={0} found'.format(gi))
 
         # loop over the other genres (j)
         # this statement relies on genres being alphabetically SORTED
@@ -135,19 +150,20 @@ def gen_corr_matrix(df_kodi_movie):
             # create genre set G_ij
             g_ij = {gi, gj}
             # consider only those movies that have gi as a genre
-            if len(movie_ids) == 0:
-                pass
-            else:
-                # loop only over the movies that have genre gi to determine
-                # correaltions
-                for k in movie_ids:
-                    # computes intersection of G_ij with movie genre set
-                    common_genres = g_ij & df_kodi_movie.loc[k, 'Genres']
-                    if len(common_genres) == 2 and gi != gj:
-                        df_genre_corrs.loc[gi, gj] += 1
-                        df_genre_corrs.loc[gj, gi] += 1
-                    elif len(common_genres) == 1 and gi == gj:
-                        df_genre_corrs.loc[gi, gj] += 1
+            # if len(movie_ids) == 0:
+            #     pass
+            # else:
+            # loop only over the movies that have genre gi to determine
+            # correaltions
+            # for k in movie_ids:
+            for k in movie_ids.loc[:, 'idMovie']:
+                # computes intersection of G_ij with movie genre set
+                common_genres = g_ij & df_kodi_movie.loc[k, 'Genres']
+                if len(common_genres) == 2 and gi != gj:
+                    df_genre_corrs.loc[gi, gj] += 1
+                    df_genre_corrs.loc[gj, gi] += 1
+                elif len(common_genres) == 1 and gi == gj:
+                    df_genre_corrs.loc[gi, gj] += 1
 
     # Normalize the total movie count for genre gi to unity
     for gi in genres:
@@ -158,7 +174,7 @@ def gen_corr_matrix(df_kodi_movie):
 
 
 start = time()
-df_genre_corrs = gen_corr_matrix(df_kodi_movie)
+df_genre_corrs = gen_corr_matrix(df_kodi_movie, df_kodi_genre, df_kodi_genre_link)
 end = time()
 elapsed_time = timedelta(seconds=end-start)
 print('Genre correlations matrix created. {0}'.format(elapsed_time))
