@@ -1,2 +1,2 @@
-example.db
-*.db
+MyVideos*
+__pycache__
