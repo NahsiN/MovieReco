@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Author: Nishan Singh Mann (nishan.singh.mann@gmail.com)
+
+Main setup file that reads in from the SQlite database and runs the algorithm.
+"""
 
 import sqlite3
-import ipdb
+#import ipdb
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -136,21 +141,6 @@ print('Genre correlations matrix created. {0}'.format(elapsed_time))
 # ----------------------------------------------------------------------- #
 # STEPS 3 and 4. Specify user preferred genres and compute recommendation
 # points for each movie
-# preferred_genres_set = {'Drama', 'Comedy'}
-#
-# start = time()
-# # loop over movies
-# for k in df_kodi_movie.index:
-#     df_kodi_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi_movie.loc[k, 'Genres'], float(df_kodi_movie.loc[k, 'Rating']))
-#
-# # Normalize recommendation points column
-# df_kodi_movie.loc[:, 'Recommendation Points'] = df_kodi_movie.loc[:, 'Recommendation Points']/df_kodi_movie.loc[:, 'Recommendation Points'].max()
-# end = time()
-# elapsed_time = timedelta(seconds=end-start)
-# print('Finished generating recommendation points. {0}'.format(elapsed_time))
-# print('Preferred genres = {0}'.format(preferred_genres_set))
-# print(df_kodi_movie.sort_values(by=['Recommendation Points'], ascending=False).head(10))
-
 prompt = ''
 while not (prompt == 'y' or prompt == 'n'):
     prompt = str(input('Would you like to specify a genre set? If you want a list of genres, type l [y/n/l]: '))
@@ -175,3 +165,18 @@ while not (prompt == 'y' or prompt == 'n'):
     elif prompt == 'n':
         print('Thanks for trying out the algorithm. Feedback welcome.')
         sys.exit()
+
+# preferred_genres_set = {'Drama', 'Comedy'}
+#
+# start = time()
+# # loop over movies
+# for k in df_kodi_movie.index:
+#     df_kodi_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi_movie.loc[k, 'Genres'], float(df_kodi_movie.loc[k, 'Rating']))
+#
+# # Normalize recommendation points column
+# df_kodi_movie.loc[:, 'Recommendation Points'] = df_kodi_movie.loc[:, 'Recommendation Points']/df_kodi_movie.loc[:, 'Recommendation Points'].max()
+# end = time()
+# elapsed_time = timedelta(seconds=end-start)
+# print('Finished generating recommendation points. {0}'.format(elapsed_time))
+# print('Preferred genres = {0}'.format(preferred_genres_set))
+# print(df_kodi_movie.sort_values(by=['Recommendation Points'], ascending=False).head(10))
