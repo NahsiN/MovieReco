@@ -2,4 +2,3 @@
 - [ ] unwatched first
 
 Goals
-3. test movielens database

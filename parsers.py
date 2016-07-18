@@ -1,5 +1,10 @@
+# -*- coding: utf-8 -*-
 """
-All the I/O routines I use depending upon the dataset
+All the I/O routines I use depending upon the dataset used.
+The goal is to parse the dataset/s into standardized dataframes used for
+generating genre correlation matrix
+
+Author: Nishan Singh Mann (nishan.singh.mann@gmail.com)
 """
 
 import sqlite3
@@ -112,7 +117,7 @@ def parse_kodi_database(fname):
     # ----------------------------------------------------------------------- #
 
 
-def parse_movielens_database(fname_item, fname_genre, fname_data):
+def parse_movielens_database_100k(fname_item, fname_genre, fname_data):
     """
     Parses movielens database and returns dataframes compatible with my notation
 
@@ -133,7 +138,7 @@ def parse_movielens_database(fname_item, fname_genre, fname_data):
 
     # movie_info = ['idMovie', 'MovieName', 'ReleaseDate', 'VideoReleaseDate', 'ImdbUrl']
     movie_info = ['MovieName', 'Year', 'VideoReleaseDate', 'ImdbUrl']
-    genres = ['unknown', 'Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
+    genres = ['unknown', 'Action', 'Adventure', 'Animation', 'Children\'s', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
     item_col_names = movie_info + genres
     # ratings_col_names = ['idUser', 'idMovie', 'Rating', 'unix_timestamp']
     data_col_names = ['idUser', 'Rating', 'unix_timestamp']
@@ -144,9 +149,9 @@ def parse_movielens_database(fname_item, fname_genre, fname_data):
     # './MovieLens/ml-100k/u.item'
     ml_item = pd.read_csv(fname_item, sep='|', encoding='latin-1', names=item_col_names, header=None, index_col=0)
     # './MovieLens/ml-100k/u.genre'
-    ml_genre = pd.read_csv(fname_genre, sep='|', header=None, names=['Genre'], index_col=1, encoding='latin-1')
+    ml_genre = pd.read_csv(fname_genre, sep='|', header=None, names=['Genres'], index_col=1, encoding='latin-1')
     # use idMovie as index
-    './MovieLens/ml-100k/u.data'
+    # './MovieLens/ml-100k/u.data'
     ml_data = pd.read_csv(fname_data, sep='\t', header=None, names=data_col_names, index_col=1, encoding='latin-1')
     print('MovieLens databases reading complete.')
 
@@ -177,7 +182,7 @@ def parse_movielens_database(fname_item, fname_genre, fname_data):
     idGenres_array = np.empty(0, dtype=int)
     for idGenre in df_genre.index:
         # genre associated with idGenre. type str
-        genre = df_genre.loc[idGenre, 'Genre']
+        genre = df_genre.loc[idGenre, 'Genres']
         # find movie ids having genre
         try:
             idMovies = ml_item[ml_item.loc[:, genre] == 1].index
@@ -194,3 +199,9 @@ def parse_movielens_database(fname_item, fname_genre, fname_data):
 
     # convert 01-Jan-1995 to datetime object. leave for now
     # datetime.datetime.strptime('01-Jan-1995', '%d-%b-%Y')
+
+def parse_movielens_database_20m():
+    """
+    Parse the 20M dataset
+    """
+    pass

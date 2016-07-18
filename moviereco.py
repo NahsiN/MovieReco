@@ -14,28 +14,35 @@ from time import time
 from datetime import timedelta
 import sys
 from algos import gen_corr_matrix, gen_recomm_pts
-from myio import parse_kodi_database
+from parsers import parse_kodi_database, parse_movielens_database
 
 # ----------------------------------------------------------------------- #
 # STEP 1: Parse sql data into Python
 # Read contents from database file
-#db_path = 'MyVideos99_NoBollywood.db'
+# db_path = 'MyVideos99_NoBollywood.db'
+# try:
+#     db_path = sys.argv[1]
+# except:
+#     print('Please specify database. Exiting.')
+#     sys.exit()
+# (df_movie, df_genre, df_genre_link) = parse_kodi_database(db_path)
+
+# for movielens
 try:
-    db_path = sys.argv[1]
+    item_path = sys.argv[1]
+    genre_path = sys.argv[2]
+    data_path = sys.argv[3]
 except:
-    print('Please specify database. Exiting.')
+    print('Please specify item, genre, data paths. Exiting')
     sys.exit()
-
-(df_kodi_movie, df_kodi_genre, df_kodi_genre_link) = parse_kodi_database(db_path)
-sys.exit()
-
-
+(df_movie, df_genre, df_genre_link) = parse_movielens_database(item_path, genre_path, data_path)
+# sys.exit()
 
 # ----------------------------------------------------------------------- #
 # STEP 2, Compute genre correlations
 # create genre correlations dataframe
 start = time()
-df_genre_corrs = gen_corr_matrix(df_kodi_movie, df_kodi_genre, df_kodi_genre_link)
+df_genre_corrs = gen_corr_matrix(df_movie, df_genre, df_genre_link)
 end = time()
 elapsed_time = timedelta(seconds=end-start)
 print('Genre correlations matrix created. {0}'.format(elapsed_time))
@@ -66,23 +73,23 @@ prompt = ''
 while not (prompt == 'y' or prompt == 'n'):
     prompt = str(input('Would you like to specify a genre set? If you want a list of genres, type l [y/n/l]: '))
     if prompt == 'y':
-        genre_ids_input = input('Enter the genreIDs of interest. E.g. entering 0,1 means you are interested in {0}, {1}: '.format(df_kodi_genre.loc[0, 'Genres'], df_kodi_genre.loc[1, 'Genres']))
+        genre_ids_input = input('Enter the genreIDs of interest. E.g. entering 0,1 means you are interested in {0}, {1}: '.format(df_genre.loc[0, 'Genres'], df_genre.loc[1, 'Genres']))
         try:
-            preferred_genres_set = set([df_kodi_genre.loc[int(i), 'Genres'] for i in genre_ids_input.split(',')])
+            preferred_genres_set = set([df_genre.loc[int(i), 'Genres'] for i in genre_ids_input.split(',')])
             print('Preferred genres = {0}'.format(preferred_genres_set))
-            print('Here are your top 10 recommendations.')
             # loop over movies
-            for k in df_kodi_movie.index:
-                df_kodi_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi_movie.loc[k, 'Genres'], float(df_kodi_movie.loc[k, 'Rating']))
+            for k in df_movie.index:
+                df_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_movie.loc[k, 'Genres'], float(df_movie.loc[k, 'Rating']))
             # Normalize recommendation points column
-            df_kodi_movie.loc[:, 'Recommendation Points'] = df_kodi_movie.loc[:, 'Recommendation Points']/df_kodi_movie.loc[:, 'Recommendation Points'].max()
-            print(df_kodi_movie[['MovieName', 'Recommendation Points', 'Genres', 'Rating', 'Year']].sort_values(by=['Recommendation Points'], ascending=False).head(10))
+            df_movie.loc[:, 'Recommendation Points'] = df_movie.loc[:, 'Recommendation Points']/df_movie.loc[:, 'Recommendation Points'].max()            
+            print('Here are your top 10 recommendations.')
+            print(df_movie[['MovieName', 'Recommendation Points', 'Genres', 'Rating', 'Year']].sort_values(by=['Recommendation Points'], ascending=False).head(10))
             prompt = ''
         except:
             print('Could not read genres, please specify correctly')
             prompt = ''
     elif prompt == 'l':
-        print('Here is the list of genres. Left Column: genreID, Right Column: Genre\n{0}'.format(df_kodi_genre.Genres.sort_values()))
+        print('Here is the list of genres. Left Column: genreID, Right Column: Genre\n{0}'.format(df_genre.Genres.sort_values()))
     elif prompt == 'n':
         print('Thanks for trying out the algorithm. Feedback welcome.')
         sys.exit()
@@ -91,13 +98,13 @@ while not (prompt == 'y' or prompt == 'n'):
 #
 # start = time()
 # # loop over movies
-# for k in df_kodi_movie.index:
-#     df_kodi_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_kodi_movie.loc[k, 'Genres'], float(df_kodi_movie.loc[k, 'Rating']))
+# for k in df_movie.index:
+#     df_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_movie.loc[k, 'Genres'], float(df_movie.loc[k, 'Rating']))
 #
 # # Normalize recommendation points column
-# df_kodi_movie.loc[:, 'Recommendation Points'] = df_kodi_movie.loc[:, 'Recommendation Points']/df_kodi_movie.loc[:, 'Recommendation Points'].max()
+# df_movie.loc[:, 'Recommendation Points'] = df_movie.loc[:, 'Recommendation Points']/df_movie.loc[:, 'Recommendation Points'].max()
 # end = time()
 # elapsed_time = timedelta(seconds=end-start)
 # print('Finished generating recommendation points. {0}'.format(elapsed_time))
 # print('Preferred genres = {0}'.format(preferred_genres_set))
-# print(df_kodi_movie.sort_values(by=['Recommendation Points'], ascending=False).head(10))
+# print(df_movie.sort_values(by=['Recommendation Points'], ascending=False).head(10))
