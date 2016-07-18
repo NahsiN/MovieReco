@@ -14,7 +14,7 @@ from time import time
 from datetime import timedelta
 import sys
 from algos import gen_corr_matrix, gen_recomm_pts
-from parsers import parse_kodi_database, parse_movielens_database
+from parsers import parse_kodi_database, parse_movielens_database_100k
 
 # ----------------------------------------------------------------------- #
 # STEP 1: Parse sql data into Python
@@ -35,7 +35,7 @@ try:
 except:
     print('Please specify item, genre, data paths. Exiting')
     sys.exit()
-(df_movie, df_genre, df_genre_link) = parse_movielens_database(item_path, genre_path, data_path)
+(df_movie, df_genre, df_genre_link) = parse_movielens_database_100k(item_path, genre_path, data_path)
 # sys.exit()
 
 # ----------------------------------------------------------------------- #
@@ -81,7 +81,7 @@ while not (prompt == 'y' or prompt == 'n'):
             for k in df_movie.index:
                 df_movie.loc[k, 'Recommendation Points'] = gen_recomm_pts(df_genre_corrs, preferred_genres_set, df_movie.loc[k, 'Genres'], float(df_movie.loc[k, 'Rating']))
             # Normalize recommendation points column
-            df_movie.loc[:, 'Recommendation Points'] = df_movie.loc[:, 'Recommendation Points']/df_movie.loc[:, 'Recommendation Points'].max()            
+            df_movie.loc[:, 'Recommendation Points'] = df_movie.loc[:, 'Recommendation Points']/df_movie.loc[:, 'Recommendation Points'].max()
             print('Here are your top 10 recommendations.')
             print(df_movie[['MovieName', 'Recommendation Points', 'Genres', 'Rating', 'Year']].sort_values(by=['Recommendation Points'], ascending=False).head(10))
             prompt = ''
