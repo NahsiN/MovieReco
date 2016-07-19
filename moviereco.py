@@ -1,9 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 Author: Nishan Singh Mann (nishan.singh.mann@gmail.com)
+PLEASE CHECK OUT GITHUB REPOSITORY FOR FULL CODE
 
-Main setup file that reads in from the SQlite database and runs the algorithm.
-Runs statistics mimicking 100 or so different users with their collections
+Repository: https://github.com/NahsiN/MovieReco/tree/movielens_statistics
+
+Main setup file that reads in the Movielens database and runs statistics
+mimicking 100 or so different users with their movie collections and different
+correlation matrices
+quantities of interest
+1) genre correlation matrix
+2) genre correlation matrix for 100 users each with 150 movies
+3) The index of coincidence between two genres
 """
 
 import sqlite3
